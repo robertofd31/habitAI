@@ -19,5 +19,5 @@ pillow>=9.5.0
 
 requests>=2.28.0
 scikit-learn>=1.2.0
-from dotenv
+python-dotenv==1.0.0
 openai
