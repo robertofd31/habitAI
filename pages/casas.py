@@ -17,17 +17,8 @@ st.set_page_config(
 # Título principal
 st.title("💰 Análisis de Rentabilidad de Propiedades en Madrid")
 st.write("Este dashboard analiza la rentabilidad potencial de propiedades en venta si se alquilan por habitaciones.")
-# Inicializar session_state para la navegación
-if "page" not in st.session_state:
-    st.session_state.page = "main"
-if "selected_property_id" not in st.session_state:
-    st.session_state.selected_property_id = None
 
-# Botón para volver al análisis principal desde la página de detalle
-if st.session_state.page == "property_detail":
-    if st.button("← Volver al análisis principal"):
-        st.session_state.page = "main"
-        st.experimental_rerun()
+
 # Cargar los datos
 @st.cache_data
 def load_property_data():
