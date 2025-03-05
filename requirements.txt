@@ -1,0 +1,18 @@
+# Bibliotecas principales
+streamlit>=1.22.0
+pandas>=1.5.3
+numpy>=1.24.3
+
+# Visualización
+matplotlib>=3.7.1
+seaborn>=0.12.2
+plotly>=5.14.1
+
+# Procesamiento geoespacial (para mapas)
+pydeck>=0.8.0
+
+# Optimización
+joblib>=1.2.0
+
+# Formato y estilo
+pillow>=9.5.0
