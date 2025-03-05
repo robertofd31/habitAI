@@ -56,119 +56,92 @@ def load_room_data():
 # Cargar datos
 df_properties = load_property_data()
 df_rooms = load_room_data()
+# Reemplaza la sección de selección de propiedad en el sidebar con esto:
 
-# Sidebar para seleccionar propiedad
 st.sidebar.header("Selección de Propiedad")
 
-# Filtros para encontrar propiedades
-district_options = sorted(df_properties['district'].dropna().unique())
-selected_district = st.sidebar.selectbox(
-    "Distrito",
-    options=district_options
+# Opción para seleccionar por ID o por filtros
+selection_method = st.sidebar.radio(
+    "Método de selección",
+    ["Introducir ID", "Filtrar por ubicación"]
 )
 
-# Filtrar barrios por distrito seleccionado
-neighborhood_options = sorted(df_properties[df_properties['district'] == selected_district]['neighborhood'].dropna().unique())
-selected_neighborhood = st.sidebar.selectbox(
-    "Barrio",
-    options=neighborhood_options
-)
+if selection_method == "Introducir ID":
+    # Campo para introducir el ID de la propiedad
+    property_id_input = st.sidebar.text_input(
+        "Introduce el ID de la propiedad (propertyCode)",
+        value=""
+    )
 
-# Filtrar propiedades por barrio seleccionado
-filtered_properties = df_properties[
-    (df_properties['district'] == selected_district) &
-    (df_properties['neighborhood'] == selected_neighborhood)
-]
+    # Verificar si el ID existe en el dataframe
+    if property_id_input:
+        if property_id_input in df_properties['propertyCode'].values:
+            selected_property_code = property_id_input
+            property_data = df_properties[df_properties['propertyCode'] == selected_property_code].iloc[0]
+            st.sidebar.success(f"Propiedad encontrada: {property_data['address'] if pd.notna(property_data['address']) else 'Sin dirección'}")
+        else:
+            st.sidebar.error("ID de propiedad no encontrado. Por favor, introduce un ID válido.")
+            # Usar la primera propiedad como fallback
+            selected_property_code = df_properties['propertyCode'].iloc[0]
+            property_data = df_properties[df_properties['propertyCode'] == selected_property_code].iloc[0]
+    else:
+        # Si no se ha introducido ningún ID, usar la primera propiedad
+        selected_property_code = df_properties['propertyCode'].iloc[0]
+        property_data = df_properties[df_properties['propertyCode'] == selected_property_code].iloc[0]
+        st.sidebar.info("Introduce un ID de propiedad o usa los filtros de ubicación.")
 
-# Crear opciones para el selectbox de propiedades
-property_options = []
-for _, row in filtered_properties.iterrows():
-    address = row['address'] if pd.notna(row['address']) else "Sin dirección"
-    price = f"{int(row['price']):,}€" if pd.notna(row['price']) else "Precio desconocido"
-    size = f"{int(row['size'])}m²" if pd.notna(row['size']) else "Tamaño desconocido"
-    rooms = f"{int(row['rooms'])} hab" if pd.notna(row['rooms']) else "Habitaciones desconocidas"
+else:  # Filtrar por ubicación
+    # Filtros para encontrar propiedades
+    district_options = sorted(df_properties['district'].dropna().unique())
+    selected_district = st.sidebar.selectbox(
+        "Distrito",
+        options=district_options
+    )
 
-    option_text = f"{address} - {price} - {size} - {rooms}"
-    property_options.append((option_text, row['propertyCode']))
+    # Filtrar barrios por distrito seleccionado
+    neighborhood_options = sorted(df_properties[df_properties['district'] == selected_district]['neighborhood'].dropna().unique())
+    selected_neighborhood = st.sidebar.selectbox(
+        "Barrio",
+        options=neighborhood_options
+    )
 
-# Crear lista de textos para mostrar en el selectbox
-property_texts = [text for text, _ in property_options]
-property_codes = [code for _, code in property_options]
+    # Filtrar propiedades por barrio seleccionado
+    filtered_properties = df_properties[
+        (df_properties['district'] == selected_district) &
+        (df_properties['neighborhood'] == selected_neighborhood)
+    ]
 
-# Selectbox para elegir propiedad
-selected_property_index = st.sidebar.selectbox(
-    "Selecciona una propiedad",
-    range(len(property_texts)),
-    format_func=lambda i: property_texts[i]
-)
+    # Crear opciones para el selectbox de propiedades
+    property_options = []
+    for _, row in filtered_properties.iterrows():
+        address = row['address'] if pd.notna(row['address']) else "Sin dirección"
+        price = f"{int(row['price']):,}€" if pd.notna(row['price']) else "Precio desconocido"
+        size = f"{int(row['size'])}m²" if pd.notna(row['size']) else "Tamaño desconocido"
+        rooms = f"{int(row['rooms'])} hab" if pd.notna(row['rooms']) else "Habitaciones desconocidas"
 
-selected_property_code = property_codes[selected_property_index]
-property_data = df_properties[df_properties['propertyCode'] == selected_property_code].iloc[0]
+        option_text = f"{address} - {price} - {size} - {rooms}"
+        property_options.append((option_text, row['propertyCode']))
 
-# Parámetros para el cálculo de rentabilidad
-st.sidebar.header("Parámetros de Rentabilidad")
+    # Crear lista de textos para mostrar en el selectbox
+    property_texts = [text for text, _ in property_options]
+    property_codes = [code for _, code in property_options]
 
-# Precio medio de alquiler por habitación (por distrito)
-avg_room_price_by_district = df_rooms.groupby('district')['price'].mean().to_dict()
-default_room_price = int(df_rooms['price'].mean())
+    if property_options:
+        # Selectbox para elegir propiedad
+        selected_property_index = st.sidebar.selectbox(
+            "Selecciona una propiedad",
+            range(len(property_texts)),
+            format_func=lambda i: property_texts[i]
+        )
 
-# Precio medio de habitación en el distrito seleccionado
-district_avg_price = avg_room_price_by_district.get(selected_district, default_room_price)
-
-# Permitir ajustar el precio de alquiler por habitación
-room_price = st.sidebar.slider(
-    f"Precio de alquiler por habitación (€)",
-    min_value=int(district_avg_price * 0.5),
-    max_value=int(district_avg_price * 1.5),
-    value=int(district_avg_price),
-    step=10
-)
-
-# Precio de alquiler tradicional (estimado como % del valor de compra anualizado)
-traditional_rental_yield = st.sidebar.slider(
-    "Rentabilidad anual alquiler tradicional (%)",
-    min_value=2.0,
-    max_value=8.0,
-    value=4.0,
-    step=0.1
-)
-
-# Gastos de reforma por m²
-renovation_cost_per_m2 = st.sidebar.slider(
-    "Coste de reforma por m² (€)",
-    min_value=0,
-    max_value=1000,
-    value=300,
-    step=50
-)
-
-# Coste de añadir una habitación (tabiques, puertas, etc.)
-cost_per_added_room = st.sidebar.slider(
-    "Coste por habitación adicional (€)",
-    min_value=1000,
-    max_value=10000,
-    value=3000,
-    step=500
-)
-
-# Gastos mensuales (comunidad, IBI, seguros, etc.)
-monthly_expenses_percent = st.sidebar.slider(
-    "Gastos mensuales (% del alquiler)",
-    min_value=5.0,
-    max_value=30.0,
-    value=15.0,
-    step=1.0
-)
-
-# Tasa de ocupación
-occupancy_rate = st.sidebar.slider(
-    "Tasa de ocupación (%)",
-    min_value=50.0,
-    max_value=100.0,
-    value=90.0,
-    step=5.0
-)
-
+        selected_property_code = property_codes[selected_property_index]
+        property_data = df_properties[df_properties['propertyCode'] == selected_property_code].iloc[0]
+    else:
+        st.sidebar.warning(f"No se encontraron propiedades en {selected_neighborhood}, {selected_district}.")
+        # Usar la primera propiedad como fallback
+        selected_property_code = df_properties['propertyCode'].iloc[0]
+        property_data = df_properties[df_properties['propertyCode'] == selected_property_code].iloc[0]
+        
 # Función para calcular la rentabilidad
 def calculate_roi(property_data, added_rooms=0, room_price=room_price):
     # Número total de habitaciones (originales + añadidas)
