@@ -23,23 +23,23 @@ def load_data():
 # Función para mostrar una habitación
 def display_room(room):
     col1, col2 = st.columns([1, 2])
-    
+
     with col1:
         if pd.notna(room['thumbnail']):
             st.image(room['thumbnail'], width=200)
         else:
             st.image("https://via.placeholder.com/200x150?text=No+Image", width=200)
-    
+
     with col2:
         st.subheader(f"{room['propertyType']} en {room['address']}")
         st.write(f"**Precio:** {room['price']}€/mes")
         st.write(f"**Tamaño:** {room['size']} m² | **Habitaciones:** {room['rooms']} | **Baños:** {room['bathrooms']}")
         st.write(f"**Barrio:** {room['neighborhood']}, {room['district']}")
-        
+
         # Mostrar descripción con botón de expansión
         with st.expander("Ver descripción"):
             st.write(room['description'])
-        
+
         # Enlace a la propiedad
         if pd.notna(room['url']):
             st.markdown(f"[Ver en Idealista]({room['url']})")
@@ -113,11 +113,11 @@ has_lift_filter = st.sidebar.radio("Ascensor", has_lift_options)
 filtered_df = df.copy()
 
 # Filtro de precio
-filtered_df = filtered_df[(filtered_df['price'] >= price_range[0]) & 
+filtered_df = filtered_df[(filtered_df['price'] >= price_range[0]) &
                           (filtered_df['price'] <= price_range[1])]
 
 # Filtro de tamaño
-filtered_df = filtered_df[(filtered_df['size'] >= size_range[0]) & 
+filtered_df = filtered_df[(filtered_df['size'] >= size_range[0]) &
                           (filtered_df['size'] <= size_range[1])]
 
 # Filtro de habitaciones
@@ -157,29 +157,29 @@ if total_pages > 0:
         value=1,
         step=1
     )
-    
+
     # Calcular índices para la página actual
     start_idx = (page_number - 1) * items_per_page
     end_idx = min(start_idx + items_per_page, len(filtered_df))
-    
+
     # Mostrar paginación
     st.write(f"Mostrando {start_idx + 1}-{end_idx} de {len(filtered_df)} habitaciones")
-    
+
     # Mostrar habitaciones para la página actual
     current_page_df = filtered_df.iloc[start_idx:end_idx]
-    
+
     # Mostrar cada habitación
     for _, room in current_page_df.iterrows():
         display_room(room)
         st.markdown("---")
-    
+
     # Botones de navegación
     col1, col2, col3 = st.columns([1, 2, 1])
     with col1:
         if page_number > 1:
             if st.button("← Anterior"):
                 page_number -= 1
-    
+
     with col3:
         if page_number < total_pages:
             if st.button("Siguiente →"):
@@ -191,4 +191,5 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.info("""
 Esta aplicación muestra habitaciones disponibles en Madrid.
-Utiliza los filtros para
+Utiliza los filtros para encontrar la habitación que mejor se adapte a tus necesidades.
+""")
