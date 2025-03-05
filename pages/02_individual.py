@@ -495,8 +495,10 @@ sensitivity_variable = st.selectbox(
     ["Precio de alquiler por habitación", "Tasa de ocupación", "Coste de reforma por m²"]
 )
 
-# Función para calcular ROI con diferentes valores de la variable seleccionada
 def calculate_sensitivity(variable, property_data, added_rooms=0):
+    # Declarar las variables globales al inicio de la función
+    global occupancy_rate, renovation_cost_per_m2
+
     results = []
 
     if variable == "Precio de alquiler por habitación":
@@ -517,12 +519,10 @@ def calculate_sensitivity(variable, property_data, added_rooms=0):
 
     elif variable == "Tasa de ocupación":
         # Variar la tasa de ocupación
-        for occ_rate in range(50, 101, 5):
-            # Guardar valor original
-            original_rate = occupancy_rate
+        original_rate = occupancy_rate  # Guardar valor original
 
+        for occ_rate in range(50, 101, 5):
             # Modificar temporalmente la variable global
-            global occupancy_rate
             occupancy_rate = occ_rate
 
             roi = calculate_roi(property_data, added_rooms=added_rooms)
@@ -532,19 +532,16 @@ def calculate_sensitivity(variable, property_data, added_rooms=0):
                 'payback': roi['payback_period_rooms']
             })
 
-            # Restaurar valor original
-            occupancy_rate = original_rate
-
+        # Restaurar valor original
+        occupancy_rate = original_rate
         x_label = "Tasa de Ocupación (%)"
 
     elif variable == "Coste de reforma por m²":
         # Variar el coste de reforma
-        for cost in range(0, 601, 50):
-            # Guardar valor original
-            original_cost = renovation_cost_per_m2
+        original_cost = renovation_cost_per_m2  # Guardar valor original
 
+        for cost in range(0, 601, 50):
             # Modificar temporalmente la variable global
-            global renovation_cost_per_m2
             renovation_cost_per_m2 = cost
 
             roi = calculate_roi(property_data, added_rooms=added_rooms)
@@ -554,9 +551,8 @@ def calculate_sensitivity(variable, property_data, added_rooms=0):
                 'payback': roi['payback_period_rooms']
             })
 
-            # Restaurar valor original
-            renovation_cost_per_m2 = original_cost
-
+        # Restaurar valor original
+        renovation_cost_per_m2 = original_cost
         x_label = "Coste de Reforma por m² (€)"
 
     return results, x_label
