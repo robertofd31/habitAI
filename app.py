@@ -26,13 +26,58 @@ def load_data():
 
     # Calcular precio por metro cuadrado
     df['price_per_m2'] = df['price'] / df['size']
-    
-    # Crear segmentos de tamaño
-    size_bins = [0, 10, 15, 20, 25, 30, 40, 50, 100, float('inf')]
-    size_labels = ['<10m²', '10-15m²', '15-20m²', '20-25m²', '25-30m²', '30-40m²', '40-50m²', '50-100m²', '>100m²']
-    df['size_segment'] = pd.cut(df['size'], bins=size_bins, labels=size_labels)
-    
+
     return df
+
+# Función para limpiar y validar la columna 'size'
+def clean_size_column(df):
+    # Crear una copia para no modificar el original
+    cleaned_df = df.copy()
+
+    # Resumen estadístico inicial
+    st.subheader("Validación de la columna 'size'")
+    st.write("Resumen estadístico inicial de la columna 'size':")
+    st.write(df['size'].describe())
+
+    # Detectar valores atípicos usando el rango intercuartílico (IQR)
+    q1 = df['size'].quantile(0.25)
+    q3 = df['size'].quantile(0.75)
+    iqr = q3 - q1
+
+    # Definir límites razonables
+    lower_bound = max(0, q1 - 1.5 * iqr)  # Asegurar que no sea negativo
+    upper_bound = q3 + 1.5 * iqr
+
+    st.write(f"Límite inferior: {lower_bound:.2f}, Límite superior: {upper_bound:.2f}")
+
+    # Opción para aplicar la limpieza
+    apply_cleaning = st.checkbox("Aplicar limpieza de valores atípicos", value=True)
+
+    if apply_cleaning:
+        # Filtrar valores atípicos
+        cleaned_df = cleaned_df[(cleaned_df['size'] >= lower_bound) & (cleaned_df['size'] <= upper_bound)]
+        st.write(f"Número de habitaciones después de eliminar valores atípicos: {len(cleaned_df)} (se eliminaron {len(df) - len(cleaned_df)} registros)")
+
+    # Visualizar la distribución de tamaños antes y después de la limpieza
+    st.subheader("Distribución de Tamaños de Habitaciones")
+    fig, ax = plt.subplots(1, 2, figsize=(12, 5))
+
+    # Antes de la limpieza
+    ax[0].hist(df['size'].dropna(), bins=20, edgecolor='k')
+    ax[0].set_title('Antes de la Limpieza')
+    ax[0].set_xlabel('Tamaño (m²)')
+    ax[0].set_ylabel('Frecuencia')
+
+    # Después de la limpieza
+    ax[1].hist(cleaned_df['size'].dropna(), bins=20, edgecolor='k')
+    ax[1].set_title('Después de la Limpieza')
+    ax[1].set_xlabel('Tamaño (m²)')
+    ax[1].set_ylabel('Frecuencia')
+
+    plt.tight_layout()
+    st.pyplot(fig)
+
+    return cleaned_df
 
 # Título principal
 st.title("📊 Análisis Macro del Mercado de Habitaciones en Madrid")
@@ -40,6 +85,9 @@ st.write("Este dashboard proporciona un análisis general del mercado de habitac
 
 # Cargar datos
 df = load_data()
+
+# Limpiar y validar la columna 'size'
+df = clean_size_column(df)
 
 # Sidebar para filtros
 st.sidebar.header("Filtros para el Análisis")
@@ -69,6 +117,11 @@ price_range = st.sidebar.slider(
     max_value=max_price,
     value=(min_price, max_price)
 )
+
+# Crear segmentos de tamaño
+size_bins = [0, 10, 15, 20, 25, 30, 40, 50, 100, float('inf')]
+size_labels = ['<10m²', '10-15m²', '15-20m²', '20-25m²', '25-30m²', '30-40m²', '40-50m²', '50-100m²', '>100m²']
+df['size_segment'] = pd.cut(df['size'], bins=size_bins, labels=size_labels)
 
 # Filtro de segmentos de tamaño
 size_segment_options = df['size_segment'].dropna().unique().tolist()
@@ -136,8 +189,8 @@ size_segment_metrics = filtered_df.groupby('size_segment').agg(
 
 # Ordenar por segmento de tamaño (para mantener el orden lógico)
 size_segment_metrics['size_segment'] = pd.Categorical(
-    size_segment_metrics['size_segment'], 
-    categories=size_segment_options,
+    size_segment_metrics['size_segment'],
+    categories=size_labels,
     ordered=True
 )
 size_segment_metrics = size_segment_metrics.sort_values('size_segment')
@@ -341,20 +394,24 @@ st.header("Análisis Geoespacial")
 # Filtrar datos para el mapa
 map_data = filtered_df[['latitude', 'longitude', 'price', 'district', 'size_segment']].dropna()
 
-# Crear mapa de precios
-fig = px.scatter_mapbox(
-    map_data,
-    lat='latitude',
-    lon='longitude',
-    color='size_segment',
-    size='price',
-    size_max=15,
-    zoom=11,
-    title='Distribución Geográfica por Segmento de Tamaño',
-    mapbox_style="carto-positron",
-    hover_data=['district', 'price', 'size_segment']
-)
-st.plotly_chart(fig, use_container_width=True)
+# Verificar si hay datos para el mapa
+if len(map_data) > 0:
+    # Crear mapa de precios
+    fig = px.scatter_mapbox(
+        map_data,
+        lat='latitude',
+        lon='longitude',
+        color='size_segment',
+        size='price',
+        size_max=15,
+        zoom=11,
+        title='Distribución Geográfica por Segmento de Tamaño',
+        mapbox_style="carto-positron",
+        hover_data=['district', 'price', 'size_segment']
+    )
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.warning("No hay datos geoespaciales disponibles para mostrar en el mapa.")
 
 # Análisis por Barrio (Top 10)
 st.header("Top 10 Barrios por Precio Promedio")
@@ -368,58 +425,68 @@ neighborhood_metrics = filtered_df.groupby('neighborhood').agg(
 ).reset_index()
 
 # Filtrar barrios con al menos 5 habitaciones
-neighborhood_metrics = neighborhood_metrics[neighborhood_metrics['habitaciones'] >= 5]
+min_rooms = st.slider("Mínimo de habitaciones por barrio", 1, 50, 5)
+neighborhood_metrics = neighborhood_metrics[neighborhood_metrics['habitaciones'] >= min_rooms]
 
 # Top 10 barrios más caros
 top_expensive = neighborhood_metrics.sort_values('precio_promedio', ascending=False).head(10)
 
-fig = px.bar(
-    top_expensive,
-    x='neighborhood',
-    y='precio_promedio',
-    title='Top 10 Barrios más Caros',
-    labels={'neighborhood': 'Barrio', 'precio_promedio': 'Precio Promedio (€/mes)'},
-    color='precio_promedio',
-    color_continuous_scale='Viridis',
-    text_auto='.2f'
-)
-fig.update_layout(xaxis_tickangle=-45)
-st.plotly_chart(fig, use_container_width=True)
+if len(top_expensive) > 0:
+    fig = px.bar(
+        top_expensive,
+        x='neighborhood',
+        y='precio_promedio',
+        title='Top 10 Barrios más Caros',
+        labels={'neighborhood': 'Barrio', 'precio_promedio': 'Precio Promedio (€/mes)'},
+        color='precio_promedio',
+        color_continuous_scale='Viridis',
+        text_auto='.2f'
+    )
+    fig.update_layout(xaxis_tickangle=-45)
+    st.plotly_chart(fig, use_container_width=True)
+else:
+    st.warning("No hay suficientes barrios que cumplan con el criterio de mínimo de habitaciones.")
 
 # Conclusiones
 st.header("Conclusiones del Análisis")
 
 # Calcular algunas estadísticas para las conclusiones
-most_expensive_district = district_metrics.loc[district_metrics['precio_promedio'].idxmax(), 'district']
-most_expensive_price = district_metrics.loc[district_metrics['precio_promedio'].idxmax(), 'precio_promedio']
+if len(district_metrics) > 0:
+    most_expensive_district = district_metrics.loc[district_metrics['precio_promedio'].idxmax(), 'district']
+    most_expensive_price = district_metrics.loc[district_metrics['precio_promedio'].idxmax(), 'precio_promedio']
 
-largest_size_district = district_metrics.loc[district_metrics['tamaño_promedio'].idxmax(), 'district']
-largest_size = district_metrics.loc[district_metrics['tamaño_promedio'].idxmax(), 'tamaño_promedio']
+    largest_size_district = district_metrics.loc[district_metrics['tamaño_promedio'].idxmax(), 'district']
+    largest_size = district_metrics.loc[district_metrics['tamaño_promedio'].idxmax(), 'tamaño_promedio']
 
-best_value_district = district_metrics.loc[district_metrics['precio_por_m2'].idxmin(), 'district']
-best_value_price = district_metrics.loc[district_metrics['precio_por_m2'].idxmin(), 'precio_por_m2']
+    best_value_district = district_metrics.loc[district_metrics['precio_por_m2'].idxmin(), 'district']
+    best_value_price = district_metrics.loc[district_metrics['precio_por_m2'].idxmin(), 'precio_por_m2']
 
-# Análisis por segmento de tamaño
-most_common_segment = filtered_df['size_segment'].value_counts().idxmax()
-most_expensive_segment = size_segment_metrics.loc[size_segment_metrics['precio_promedio'].idxmax(), 'size_segment']
-most_expensive_segment_price = size_segment_metrics.loc[size_segment_metrics['precio_promedio'].idxmax(), 'precio_promedio']
-best_value_segment = size_segment_metrics.loc[size_segment_metrics['precio_por_m2'].idxmin(), 'size_segment']
-best_value_segment_price = size_segment_metrics.loc[size_segment_metrics['precio_por_m2'].idxmin(), 'precio_por_m2']
+    # Análisis por segmento de tamaño
+    most_common_segment = filtered_df['size_segment'].value_counts().idxmax()
 
-st.write(f"""
-### Conclusiones por Distrito:
-- El distrito más caro es **{most_expensive_district}** con un precio promedio de **{most_expensive_price:.2f}€/mes**.
-- El distrito con habitaciones más grandes es **{largest_size_district}** con un tamaño promedio de **{largest_size:.2f}m²**.
-- El distrito con mejor relación precio/tamaño es **{best_value_district}** con un precio por m² de **{best_value_price:.2f}€/m²**.
+    if len(size_segment_metrics) > 0:
+        most_expensive_segment = size_segment_metrics.loc[size_segment_metrics['precio_promedio'].idxmax(), 'size_segment']
+        most_expensive_segment_price = size_segment_metrics.loc[size_segment_metrics['precio_promedio'].idxmax(), 'precio_promedio']
 
-### Conclusiones por Segmento de Tamaño:
-- El segmento de tamaño más común es **{most_common_segment}**.
-- El segmento de tamaño más caro es **{most_expensive_segment}** con un precio promedio de **{most_expensive_segment_price:.2f}€/mes**.
-- El segmento con mejor relación precio/tamaño es **{best_value_segment}** con un precio por m² de **{best_value_segment_price:.2f}€/m²**.
+        best_value_segment = size_segment_metrics.loc[size_segment_metrics['precio_por_m2'].idxmin(), 'size_segment']
+        best_value_segment_price = size_segment_metrics.loc[size_segment_metrics['precio_por_m2'].idxmin(), 'precio_por_m2']
 
-### Correlaciones:
-- La correlación entre precio y tamaño es de **{corr_df.loc['price', 'size']:.2f}**, lo que indica una relación {abs(corr_df.loc['price', 'size']) > 0.5 and 'fuerte' or 'moderada a débil'} entre estas variables.
-""")
+    st.write(f"""
+    ### Conclusiones por Distrito:
+    - El distrito más caro es **{most_expensive_district}** con un precio promedio de **{most_expensive_price:.2f}€/mes**.
+    - El distrito con habitaciones más grandes es **{largest_size_district}** con un tamaño promedio de **{largest_size:.2f}m²**.
+    - El distrito con mejor relación precio/tamaño es **{best_value_district}** con un precio por m² de **{best_value_price:.2f}€/m²**.
+
+    ### Conclusiones por Segmento de Tamaño:
+    - El segmento de tamaño más común es **{most_common_segment}**.
+    - El segmento de tamaño más caro es **{most_expensive_segment}** con un precio promedio de **{most_expensive_segment_price:.2f}€/mes**.
+    - El segmento con mejor relación precio/tamaño es **{best_value_segment}** con un precio por m² de **{best_value_segment_price:.2f}€/m²**.
+
+    ### Correlaciones:
+    - La correlación entre precio y tamaño es de **{corr_df.loc['price', 'size']:.2f}**, lo que indica una relación {abs(corr_df.loc['price', 'size']) > 0.5 and 'fuerte' or 'moderada a débil'} entre estas variables.
+    """)
+else:
+    st.warning("No hay suficientes datos para generar conclusiones.")
 
 # Información adicional
 st.sidebar.markdown("---")
