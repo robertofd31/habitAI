@@ -510,18 +510,27 @@ positive_roi_properties = results_df[results_df['annual_roi_rooms'] > 0]
 # Ordenar por ROI en alquiler por habitaciones
 top_properties = positive_roi_properties.sort_values('annual_roi_rooms', ascending=False)
 
-# Mostrar las mejores propiedades
+# En tu script principal, donde muestras las tablas de Top Propiedades
+
+# Para la tabla de propiedades sin habitaciones adicionales
 st.subheader("Top Propiedades por ROI (Sin Habitaciones Adicionales)")
 top_base_properties = top_properties[top_properties['added_rooms'] == 0].head(10)
-st.dataframe(
-    top_base_properties[['property_id', 'district', 'neighborhood', 'original_price', 'size', 'original_rooms', 'annual_roi_rooms', 'payback_period_rooms']].style.format({
-        'original_price': '{:,.2f} €',
-        'size': '{:.2f} m²',
-        'annual_roi_rooms': '{:.2f}%',
-        'payback_period_rooms': '{:.2f} años'
-    }),
-    use_container_width=True
-)
+
+# Añadir columna con botones para ver detalles
+for index, row in top_base_properties.iterrows():
+    property_id = row['property_id']
+    col1, col2 = st.columns([0.9, 0.1])
+    with col1:
+        st.write(f"**Propiedad:** {property_id} - {row['district']}, {row['neighborhood']}")
+        st.write(f"Precio: {row['original_price']:,.2f} € | Tamaño: {row['size']:.2f} m² | ROI: {row['annual_roi_rooms']:.2f}%")
+    with col2:
+        if st.button(f"Ver detalles", key=f"btn_{property_id}"):
+            # Guardar el ID de la propiedad en session_state
+            st.session_state.selected_property_id = property_id
+            st.session_state.page = "property_detail"
+            st.experimental_rerun()
+
+# Hacer lo mismo para las otras tablas (1 habitación adicional, 2 habitaciones adicionales)
 
 st.subheader("Top Propiedades por ROI (Con 1 Habitación Adicional)")
 top_1room_properties = top_properties[top_properties['added_rooms'] == 1].head(10)
